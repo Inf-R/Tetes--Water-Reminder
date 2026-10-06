@@ -7,7 +7,9 @@ import 'models/water_log.dart';
 import 'providers/settings_provider.dart';
 import 'providers/water_intake_provider.dart';
 import 'screens/onboarding_screen.dart';
-import 'screens/home_screen.dart';
+import 'screens/main_shell.dart';
+import 'services/notification_service.dart';
+import 'theme/app_theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -22,6 +24,17 @@ void main() async {
   // Open boxes
   final settingsBox = await Hive.openBox<UserSettings>('user_settings');
   final waterLogBox = await Hive.openBox<WaterLog>('water_logs');
+
+  // Initialize notifications
+  final notificationService = NotificationService();
+  await notificationService.init();
+
+  // Reschedule notifications if user already onboarded
+  // (handles app restart and device reboot)
+  if (settingsBox.isNotEmpty) {
+    final settings = settingsBox.values.first;
+    await notificationService.scheduleReminders(settings);
+  }
 
   runApp(
     ProviderScope(
@@ -45,12 +58,8 @@ class AquaTrackApp extends ConsumerWidget {
     return MaterialApp(
       title: 'AquaTrack',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorSchemeSeed: const Color(0xFF2196F3),
-        useMaterial3: true,
-        brightness: Brightness.light,
-      ),
-      home: isOnboarded ? const HomeScreen() : const OnboardingScreen(),
+      theme: AppTheme.lightTheme,
+      home: isOnboarded ? const MainShell() : const OnboardingScreen(),
     );
   }
 }

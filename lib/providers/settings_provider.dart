@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import '../models/user_settings.dart';
+import '../services/notification_service.dart';
 
 /// Provider for the UserSettings Hive box
 final settingsBoxProvider = Provider<Box<UserSettings>>((ref) {
@@ -18,6 +19,9 @@ class SettingsNotifier extends StateNotifier<UserSettings?> {
   Future<void> saveSettings(UserSettings settings) async {
     await _box.put('settings', settings);
     state = settings;
+    
+    // Reschedule notifications with new settings
+    await NotificationService().scheduleReminders(settings);
   }
 
   Future<void> updateSettings({
@@ -45,6 +49,9 @@ class SettingsNotifier extends StateNotifier<UserSettings?> {
   Future<void> clearSettings() async {
     await _box.delete('settings');
     state = null;
+    
+    // Cancel all notifications on reset
+    await NotificationService().cancelAll();
   }
 }
 

@@ -12,7 +12,7 @@ without re-explaining everything.
 - Flutter (stable channel)
 - State management: flutter_riverpod
 - Local storage: hive + hive_flutter
-- Notifications: flutter_local_notifications + timezone
+- Notifications: flutter_local_notifications + timezone + flutter_timezone
 - Charts: fl_chart
 - Date/time: intl
 - IDs: uuid
@@ -69,32 +69,79 @@ Full provider logic (addLog, getTodayTotal, getLastNDays, findBestDay,
 deleteLog, etc.), DailyIntake model with percentage getter. 31/31 unit 
 tests passing. Verified: `flutter analyze` clean, `flutter test` clean.
 
-### Phase 3 — Onboarding + Home UI 🟡 IN PROGRESS, UNVERIFIED
-Created but **not yet verified** (no `flutter analyze`/`flutter test` run 
-since creation — check for errors before trusting this code):
-- `lib/widgets/water_bottle_painter.dart`
-- `lib/screens/onboarding_screen.dart`
-- `lib/screens/home_screen.dart`
-- `lib/screens/main_shell.dart` (bottom nav shell)
+### Phase 3 — Onboarding + Home UI ✅ DONE
+Full UI implementation:
+- `lib/theme/app_theme.dart` — brand colors, gradients, shadows, ThemeData
+- `lib/widgets/water_bottle_painter.dart` — animated bottle with wave effect, 
+  CustomPainter + CustomClipper, uses TickerProviderStateMixin (not Single) 
+  to allow multiple AnimationControllers
+- `lib/screens/onboarding_screen.dart` — weight input, wake/sleep time 
+  pickers, target calculation, animated transitions, requests notification 
+  permissions on completion
+- `lib/screens/home_screen.dart` — animated bottle widget, progress %, 
+  quick-add buttons (+100/+200/custom), reminder card, motivational messages
+- `lib/screens/main_shell.dart` — bottom nav shell with animated pill 
+  indicators (kept this over main_navigation.dart — custom, more polished)
 
-**Not yet done:** `main.dart` still uses inline `ThemeData` and routes 
-directly to `HomeScreen` — needs to be updated to use `AppTheme.lightTheme` 
-and route through `MainShell`.
+Verified: `flutter analyze` clean, `flutter build apk --debug` successful.
 
-**Next steps for whoever picks this up:**
-1. Run `flutter analyze`, fix any errors in the 4 files above.
-2. Read through them to confirm what's actually implemented.
-3. Wire `main.dart` to `AppTheme.lightTheme` + `MainShell`.
-4. Verify end-to-end on an emulator: onboarding → home with animated 
-   bottle → bottom nav works.
+### Phase 4 — Notifications ✅ DONE
+Implemented local notification scheduling:
+- **AndroidManifest.xml** — added POST_NOTIFICATIONS, SCHEDULE_EXACT_ALARM, 
+  USE_EXACT_ALARM, RECEIVE_BOOT_COMPLETED, WAKE_LOCK permissions; registered 
+  ScheduledNotificationBootReceiver and ScheduledNotificationReceiver from 
+  flutter_local_notifications plugin for boot persistence
+- **lib/services/notification_service.dart** — singleton service with:
+  - `init()` — initialize plugin + timezone data, auto-detect device IANA 
+    timezone via `flutter_timezone` package (see bug fix below)
+  - `requestPermissions()` — request POST_NOTIFICATIONS (Android 13+) and 
+    exact alarm permissions (Android 12+)
+  - `scheduleReminders(settings)` — cancel existing, schedule daily repeating 
+    notifications at each interval between wake/sleep time using 
+    `matchDateTimeComponents: DateTimeComponents.time` (simpler than 7-day 
+    batch scheduling)
+  - `_logPendingNotifications()` — diagnostic: dumps all pending OS 
+    notification requests after scheduling
+  - `cancelAll()` — cancel all scheduled notifications
+- **Wiring:**
+  - `main.dart` — init NotificationService on app startup, reschedule 
+    notifications if user already onboarded (handles app restart/reboot)
+  - `onboarding_screen.dart` — request permissions + schedule on first setup
+  - `settings_provider.dart` — reschedule on settings update, cancel on reset
 
-### Phase 4 — Notifications ⬜ NOT STARTED
-flutter_local_notifications + timezone scheduling, repeating reminders 
-between wakeTime/sleepTime at reminderIntervalMinutes, reschedule on 
-settings change.
+**Strategy choice:** Used `matchDateTimeComponents: DateTimeComponents.time` 
+for daily repeating notifications at specific times (e.g., 7:00, 9:00, 11:00). 
+Simpler and more reliable than scheduling 7 days ahead + periodic rescheduler.
 
-### Phase 5 — History + Settings UI ⬜ NOT STARTED
-Bar chart + daily record list; settings fields + reset flow.
+**Boot persistence:** Implemented via flutter_local_notifications' built-in 
+boot receiver (ScheduledNotificationBootReceiver). Notifications scheduled 
+with exact alarm mode should survive reboot on Android 12+. Plugin handles 
+receiver registration automatically.
+
+**Bug fix (timezone resolution):** Original code used 
+`DateTime.now().timeZoneName` which returns abbreviations like "WIB"/"ICT" — 
+NOT IANA identifiers. `tz.getLocation()` threw on these, catch block fell 
+back to `tz.local` which defaulted to UTC. All notifications were scheduled 
+in UTC, causing them to appear "missed" until app reopened (when 
+`scheduleReminders()` re-ran and some computed as past → fired immediately). 
+Fixed by replacing with `FlutterTimezone.getLocalTimezone()` from the 
+`flutter_timezone` package, which returns the correct IANA name (e.g. 
+"Asia/Jakarta"). Added diagnostic `developer.log()` calls to log each 
+scheduled TZDateTime and the full pendingNotificationRequests() list.
+
+**Known limitations:**
+- Exact alarm permission may require user to manually enable in system 
+  settings on some devices (Android 12+)
+- OEM battery optimization (Xiaomi, Oppo, etc.) may kill notifications — 
+  users may need to whitelist app in battery settings
+- Notification content is static ("Time to hydrate!") — no dynamic 
+  personalization based on progress
+
+Verified: `flutter analyze` clean, `flutter build apk --debug` successful. 
+**Awaiting physical device testing** to confirm fix.
+
+### Phase 5 — History + Settings UI ✅ DONE
+Bar chart + daily record list; settings fields + reset flow. Code-complete.
 
 ### Phase 6 — Polish & verification ⬜ NOT STARTED
 Dark mode check, different screen sizes, end-to-end test pass.
@@ -104,3 +151,6 @@ Dark mode check, different screen sizes, end-to-end test pass.
   a hung `flutter build apk` is an error, give it time.
 - `AnimatedBuilder` is a real, correct Flutter widget — no need to 
   second-guess it.
+- `DateTime.now().timeZoneName` returns abbreviations ("WIB", "EST") not 
+  IANA names — NEVER use it with `tz.getLocation()`. Use `flutter_timezone` 
+  package's `FlutterTimezone.getLocalTimezone()` instead.
