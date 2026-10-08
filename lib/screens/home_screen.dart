@@ -140,14 +140,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           child: const Icon(Icons.water_drop, color: Colors.white, size: 18),
         ),
         const SizedBox(width: 10),
-        const Text(
+        const Flexible(child: Text(
           'AquaTrack',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
           style: TextStyle(
             fontSize: 22,
             fontWeight: FontWeight.w800,
             color: AppTheme.primaryBlue,
           ),
-        ),
+        )),
         const Spacer(),
         Container(
           decoration: BoxDecoration(
@@ -188,7 +190,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             child: const Icon(Icons.access_time, color: AppTheme.primaryBlue, size: 22),
           ),
           const SizedBox(width: 14),
-          Column(
+          Expanded(child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
@@ -207,8 +209,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 ),
               ),
             ],
-          ),
-          const Spacer(),
+          )),
           Icon(
             Icons.chevron_right,
             color: AppTheme.textLight,
@@ -219,44 +220,23 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   }
 
   Widget _buildBottleSection(int todayTotal, int targetMl, double progress, int percentText) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        // Bottle
-        AnimatedWaterBottle(
-          fillPercent: progress,
-          width: 130,
-          height: 240,
-        ),
-        const SizedBox(width: 24),
-        // Stats
-        Column(
+    return LayoutBuilder(builder: (context, constraints) {
+      final compact = constraints.maxWidth < 340;
+      final bottle = AnimatedWaterBottle(
+        fillPercent: progress,
+        width: compact ? 110 : 130,
+        height: compact ? 205 : 240,
+      );
+      final stats = Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Intake amount
-            RichText(
-              text: TextSpan(
-                children: [
-                  TextSpan(
-                    text: '$todayTotal',
-                    style: const TextStyle(
-                      fontSize: 36,
-                      fontWeight: FontWeight.w800,
-                      color: AppTheme.textPrimary,
-                    ),
-                  ),
-                  TextSpan(
-                    text: ' / $targetMl ml',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
-                      color: AppTheme.textSecondary,
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            // Keep long totals/targets within the available width.
+            Text('$todayTotal ml',
+                style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w800,
+                    color: AppTheme.textPrimary)),
+            Text('of $targetMl ml',
+                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500,
+                    color: AppTheme.textSecondary)),
             const SizedBox(height: 8),
             // Progress percentage
             Text(
@@ -288,9 +268,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 color: AppTheme.waterMedium,
               ),
           ],
-        ),
-      ],
-    );
+        );
+      if (compact) {
+        return Column(children: [bottle, const SizedBox(height: 12), stats]);
+      }
+      return Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [bottle, const SizedBox(width: 16),
+          Flexible(child: FittedBox(fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft, child: stats))],
+      );
+    });
   }
 
   Widget _buildMotivationBadge({
@@ -324,13 +312,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   }
 
   Widget _buildQuickAddButtons() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
+    return Wrap(
+      alignment: WrapAlignment.center,
+      spacing: 16,
+      runSpacing: 16,
       children: [
         _buildQuickAddButton(100, Icons.water_drop_outlined),
-        const SizedBox(width: 16),
         _buildQuickAddButton(200, Icons.water_drop),
-        const SizedBox(width: 16),
         _buildCustomAddButton(),
       ],
     );
@@ -417,7 +405,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             child: const Icon(Icons.flag_outlined, color: AppTheme.primaryBlue, size: 22),
           ),
           const SizedBox(width: 14),
-          Column(
+          Expanded(child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
@@ -436,8 +424,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 ),
               ),
             ],
-          ),
-          const Spacer(),
+          )),
           Icon(
             Icons.chevron_right,
             color: AppTheme.textLight,

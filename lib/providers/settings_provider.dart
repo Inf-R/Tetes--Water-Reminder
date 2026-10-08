@@ -16,12 +16,14 @@ class SettingsNotifier extends StateNotifier<UserSettings?> {
 
   bool get isOnboarded => state != null;
 
-  Future<void> saveSettings(UserSettings settings) async {
+  Future<void> saveSettings(UserSettings settings, {bool scheduleNotifications = true}) async {
     await _box.put('settings', settings);
     state = settings;
-    
-    // Reschedule notifications with new settings
-    await NotificationService().scheduleReminders(settings);
+
+    // Onboarding requests permissions after navigating; it schedules separately.
+    if (scheduleNotifications) {
+      await NotificationService().scheduleReminders(settings, source: 'settings.saveSettings');
+    }
   }
 
   Future<void> updateSettings({
@@ -51,7 +53,7 @@ class SettingsNotifier extends StateNotifier<UserSettings?> {
     state = null;
     
     // Cancel all notifications on reset
-    await NotificationService().cancelAll();
+    await NotificationService().cancelAll(source: 'settings.clearSettings');
   }
 }
 

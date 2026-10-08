@@ -45,24 +45,24 @@ class _MainShellState extends State<MainShell> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                _buildNavItem(
+                Expanded(child: _buildNavItem(
                   index: 0,
                   icon: Icons.home_outlined,
                   activeIcon: Icons.home_rounded,
                   label: 'Home',
-                ),
-                _buildNavItem(
+                )),
+                Expanded(child: _buildNavItem(
                   index: 1,
                   icon: Icons.bar_chart_outlined,
                   activeIcon: Icons.bar_chart_rounded,
                   label: 'History',
-                ),
-                _buildNavItem(
+                )),
+                Expanded(child: _buildNavItem(
                   index: 2,
                   icon: Icons.settings_outlined,
                   activeIcon: Icons.settings_rounded,
                   label: 'Settings',
-                ),
+                )),
               ],
             ),
           ),
@@ -103,6 +103,8 @@ class _MainShellState extends State<MainShell> {
             const SizedBox(height: 2),
             Text(
               label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,

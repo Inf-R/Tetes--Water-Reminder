@@ -12,6 +12,7 @@ class HistoryScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final settings = ref.watch(settingsProvider);
+    ref.watch(waterIntakeProvider); // Rebuild chart/list when a log changes.
     final targetMl = settings?.dailyTargetMl ?? 2000;
     final last7Days = ref.read(waterIntakeProvider.notifier).getLastNDays(7, targetMl: targetMl);
     final bestDay = WaterIntakeNotifier.findBestDay(last7Days);
@@ -175,11 +176,13 @@ class HistoryScreen extends ConsumerWidget {
               ],
             ),
           ),
-          Column(
+          Flexible(child: Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
                 '${bestDay.totalMl} ml',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.w800,
@@ -195,7 +198,7 @@ class HistoryScreen extends ConsumerWidget {
                 ),
               ),
             ],
-          ),
+          )),
         ],
       ),
     );
@@ -412,8 +415,10 @@ class HistoryScreen extends ConsumerWidget {
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            '${day.totalMl} ml',
-                            style: TextStyle(
+              '${day.totalMl} ml',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
                               fontSize: 12,
                               color: AppTheme.textSecondary,
                             ),

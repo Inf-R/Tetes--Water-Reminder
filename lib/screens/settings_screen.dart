@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/user_settings.dart';
 import '../providers/settings_provider.dart';
 import '../providers/water_intake_provider.dart';
-import '../services/notification_service.dart';
 import '../theme/app_theme.dart';
 import 'onboarding_screen.dart';
 
@@ -228,12 +227,17 @@ class SettingsScreen extends ConsumerWidget {
               ),
             ),
             if (value.isNotEmpty) ...[
-              Text(
-                value,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: AppTheme.textSecondary,
+              Flexible(
+                child: Text(
+                  value,
+                  maxLines: 2,
+                  textAlign: TextAlign.end,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: AppTheme.textSecondary,
+                  ),
                 ),
               ),
               const SizedBox(width: 8),
@@ -419,9 +423,6 @@ class SettingsScreen extends ConsumerWidget {
               
               // Clear settings (also cancels notifications via SettingsNotifier)
               await ref.read(settingsProvider.notifier).clearSettings();
-              
-              // Cancel all notifications explicitly
-              await NotificationService().cancelAll();
               
               // Navigate back to onboarding
               if (ctx.mounted) {

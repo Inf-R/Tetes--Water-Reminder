@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:developer' as developer;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -119,17 +122,29 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
       sleepTimeMinute: _sleepTime.minute,
     );
 
-    await ref.read(settingsProvider.notifier).saveSettings(settings);
+    await ref.read(settingsProvider.notifier).saveSettings(
+      settings,
+      scheduleNotifications: false,
+    );
 
-    // Request notification permissions and schedule reminders
-    final notificationService = NotificationService();
-    await notificationService.requestPermissions();
-    await notificationService.scheduleReminders(settings);
+    if (!mounted) return;
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(builder: (_) => const MainShell()),
+    );
+    // The new screen must render before native permission prompts/scheduling.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(_requestAndSchedule(settings));
+    });
+  }
 
-    if (mounted) {
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const MainShell()),
-      );
+  Future<void> _requestAndSchedule(UserSettings settings) async {
+    try {
+      final notificationService = NotificationService();
+      await notificationService.requestPermissions();
+      await notificationService.scheduleReminders(settings, source: 'onboarding');
+    } catch (error, stack) {
+      developer.log('Onboarding notification setup failed',
+          name: 'OnboardingScreen', error: error, stackTrace: stack);
     }
   }
 

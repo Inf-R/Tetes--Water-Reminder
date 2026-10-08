@@ -16,11 +16,21 @@ class NotificationService {
       FlutterLocalNotificationsPlugin();
 
   bool _initialized = false;
+  Future<void>? _initializing;
+  Future<void> _scheduling = Future<void>.value();
+
+  void _trace(String message, {bool stack = false}) {
+    developer.log('${DateTime.now().toIso8601String()} $message',
+        name: 'NotificationService', stackTrace: stack ? StackTrace.current : null);
+  }
 
   /// Initialize the notification plugin and timezone data
-  Future<void> init() async {
-    if (_initialized) return;
+  Future<void> init() => _initialized
+      ? Future<void>.value()
+      : (_initializing ??= _initOnce().whenComplete(() => _initializing = null));
 
+  Future<void> _initOnce() async {
+    _trace('init started');
     // Initialize timezone database
     tz.initializeTimeZones();
 
@@ -60,6 +70,7 @@ class NotificationService {
     );
 
     _initialized = true;
+    _trace('init completed');
   }
 
   /// Handle notification tap
@@ -94,11 +105,22 @@ class NotificationService {
   /// Strategy: Use `matchDateTimeComponents: DateTimeComponents.time` to
   /// schedule notifications that repeat daily at specific times.
   /// This is simpler than scheduling 7 days ahead and re-scheduling weekly.
-  Future<void> scheduleReminders(UserSettings settings) async {
-    if (!_initialized) await init();
+  Future<void> scheduleReminders(UserSettings settings, {String source = 'unknown'}) {
+    _trace('scheduleReminders requested by $source', stack: true);
+    // Serialize overlapping startup/settings/reset operations so stale jobs
+    // cannot cancel a newer schedule after it finishes.
+    final job = _scheduling.catchError((Object _) {}).then((_) async {
+      if (!_initialized) await init();
+      await _scheduleReminders(settings, source);
+    });
+    _scheduling = job;
+    return job;
+  }
 
+  Future<void> _scheduleReminders(UserSettings settings, String source) async {
+    _trace('scheduleReminders BEGIN source=$source');
     // Cancel all existing notifications first
-    await cancelAll();
+    await _cancelAll(source: 'scheduleReminders/$source');
 
     final now = tz.TZDateTime.now(tz.local);
     final wakeHour = settings.wakeTimeHour;
@@ -180,14 +202,21 @@ class NotificationService {
     }
 
     // Verify: log all pending notification requests
-    await _logPendingNotifications();
+    await _logPendingNotifications('after schedule/$source');
+    _trace('scheduleReminders END source=$source');
   }
 
-  /// Log all pending notifications for diagnostic purposes
-  Future<void> _logPendingNotifications() async {
+  /// Snapshot on resume: compare with the last scheduling snapshot and
+  /// adb's alarm/notification dumps to distinguish app cancellation from OS.
+  Future<void> logPendingNotifications(String reason) async {
+    if (!_initialized) await init();
+    await _logPendingNotifications(reason);
+  }
+
+  Future<void> _logPendingNotifications(String reason) async {
     final pending = await _notifications.pendingNotificationRequests();
     developer.log(
-      '--- Pending notification requests: ${pending.length} ---',
+      '${DateTime.now().toIso8601String()} [$reason] --- Pending notification requests: ${pending.length} ---',
       name: 'NotificationService',
     );
     for (final req in pending) {
@@ -203,8 +232,19 @@ class NotificationService {
   }
 
   /// Cancel all scheduled notifications
-  Future<void> cancelAll() async {
+  Future<void> cancelAll({String source = 'unknown'}) {
+    _trace('cancelAll requested by $source', stack: true);
+    final job = _scheduling.catchError((Object _) {}).then((_) async {
+      await _cancelAll(source: source);
+    });
+    _scheduling = job;
+    return job;
+  }
+
+  Future<void> _cancelAll({required String source}) async {
+    _trace('cancelAll BEGIN source=$source', stack: true);
     await _notifications.cancelAll();
+    await _logPendingNotifications('after cancelAll/$source');
   }
 
   /// Check if notifications are enabled
